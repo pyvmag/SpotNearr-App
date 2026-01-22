@@ -46,7 +46,7 @@ export default function ProfileSetupScreen() {
         if (session?.user?.name && !name) {
             setName(session.user.name);
         }
-    }, [session]);
+    }, [session, name]);
 
     // Handle Username Validation Logic
     useEffect(() => {

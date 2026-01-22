@@ -10,6 +10,8 @@ import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/convex/_generated/api";
 import { View, ActivityIndicator } from "react-native";
+import { LocationProvider } from "@/src/context/LocationContext";
+import { ModeContextProvider } from "@/src/context/ModeContext";
 import "./globals.css"
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL as string, {
   expectAuth: true,
@@ -84,7 +86,11 @@ export default function MyLayout() {
     <StrictMode>
       <ConvexProvider client={convex}>
         <ConvexBetterAuthProvider client={convex} authClient={authClient}>
-          <NavigationGate />
+          <LocationProvider>
+            <ModeContextProvider>
+              <NavigationGate />
+            </ModeContextProvider>
+          </LocationProvider>
         </ConvexBetterAuthProvider>
       </ConvexProvider>
     </StrictMode>

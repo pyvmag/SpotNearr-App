@@ -1,9 +1,2 @@
-import {View, Text} from 'react-native';
+export { default } from "@/components/profile/profile";
 
-export default function Profile() {
-    return(
-        <View>
-            <Text>Profile</Text>
-        </View>
-    )
-}

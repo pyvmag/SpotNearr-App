@@ -8,8 +8,14 @@
  * @module
  */
 
+import type * as actions from "../actions.js";
 import type * as auth from "../auth.js";
+import type * as business from "../business.js";
+import type * as content from "../content.js";
+import type * as favourites from "../favourites.js";
 import type * as http from "../http.js";
+import type * as lib_cloudinary from "../lib/cloudinary.js";
+import type * as lib_cloudinaryUtils from "../lib/cloudinaryUtils.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,8 +25,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  actions: typeof actions;
   auth: typeof auth;
+  business: typeof business;
+  content: typeof content;
+  favourites: typeof favourites;
   http: typeof http;
+  "lib/cloudinary": typeof lib_cloudinary;
+  "lib/cloudinaryUtils": typeof lib_cloudinaryUtils;
   users: typeof users;
 }>;
 
