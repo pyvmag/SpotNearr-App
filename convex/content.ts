@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-
 const MAX_ACTIVE_OFFERS = 3;
 
 export const getContentByBusiness = query({

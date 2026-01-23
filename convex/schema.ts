@@ -76,6 +76,12 @@ export const Content = {
   createdAt: v.number(),
 };
 
+export const seenContent = {
+  userId: v.id("users"),
+  contentId: v.id("content"),
+  contentCreatedAt: v.number(),
+}
+
 export const Favorite = {
   userId: v.id("users"),
   businessId: v.id("businesses"),
@@ -123,4 +129,8 @@ export default defineSchema({
     .index("by_userAId", ["userAId"])
     .index("by_userBId", ["userBId"])
     .index("by_both_users", ["userAId", "userBId"]),
+
+  seenContent: defineTable(seenContent)
+    .index("by_user_content", ["userId", "contentId"])
+    .index("content_createdAt", ["contentCreatedAt"]),
 });
