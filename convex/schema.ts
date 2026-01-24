@@ -54,6 +54,8 @@ export const Business = {
   address: v.optional(v.string()),
   bio: v.optional(v.string()),
   createdAt: v.number(),
+  rating: v.optional(v.number()),      // e.g. 4.8
+  reviewCount: v.optional(v.number()),
 };
 
 export const Content = {
@@ -93,6 +95,15 @@ export const Friends = {
   )
 };
 
+export const Review = {
+  userId: v.id("users"),
+  businessId: v.id("businesses"),
+  rating: v.number(), // 1 to 5
+  content: v.string(),
+  imageUrl: v.optional(v.string()), // For later
+  createdAt: v.number(),
+};
+
 export default defineSchema({
   users: defineTable(User)
     .index("by_username", ["username"])
@@ -108,7 +119,6 @@ export default defineSchema({
   businessTypes: defineTable(BusinessType)
     .index("by_slug", ["slug"])
     .index("by_categoryId", ["categoryId"]),
-
 
   businessCategories: defineTable(BusinessCategory)
     .index("by_slug", ["slug"]),
@@ -130,4 +140,8 @@ export default defineSchema({
   seenContent: defineTable(seenContent)
     .index("by_user_content", ["userId", "contentId"])
     .index("content_createdAt", ["contentCreatedAt"]),
+
+  reviews: defineTable(Review)
+    .index("by_business", ["businessId"])
+    .index("by_user", ["userId"]),
 });

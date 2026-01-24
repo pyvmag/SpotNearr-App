@@ -20,6 +20,7 @@ import type * as favourites from "../favourites.js";
 import type * as http from "../http.js";
 import type * as lib_cloudinary from "../lib/cloudinary.js";
 import type * as lib_cloudinaryUtils from "../lib/cloudinaryUtils.js";
+import type * as review from "../review.js";
 import type * as users from "../users.js";
 
 import type {
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/cloudinary": typeof lib_cloudinary;
   "lib/cloudinaryUtils": typeof lib_cloudinaryUtils;
+  review: typeof review;
   users: typeof users;
 }>;
 
