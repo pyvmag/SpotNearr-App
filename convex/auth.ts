@@ -15,6 +15,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     trustedOrigins: ["spotnearr://",
         "exp://595s90w-shrey2711-8081.exp.direct",
+        "exp://qf7vdl4-anonymous-8081.exp.direct",
         "https://spotnearr.com",
     ],
     database: authComponent.adapter(ctx),
