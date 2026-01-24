@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
+// 1. Define the shape of our Location Data
 type UserLocation = {
   lat: number;
   lng: number;
@@ -13,6 +14,9 @@ type LocationContextType = {
   loading: boolean;
   requestCurrentLocation: () => Promise<void>;
   setManualLocation: (location: UserLocation) => Promise<void>;
+
+  radius: number;
+  setRadius: (r: number) => void;
 };
 
 const LocationContext = createContext<LocationContextType | null>(null);
@@ -20,17 +24,29 @@ const LocationContext = createContext<LocationContextType | null>(null);
 export const LocationProvider = ({ children }: { children: React.ReactNode }) => {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // ✨ NEW: Default radius 5km
+  const [radius, setRadiusState] = useState(5); 
 
+  // 3. Load saved data (Location + Radius) on startup
   useEffect(() => {
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem("user_location");
-        if (stored) {
-          setLocation(JSON.parse(stored));
+        // Load Location
+        const storedLocation = await AsyncStorage.getItem("user_location");
+        if (storedLocation) {
+          setLocation(JSON.parse(storedLocation));
         }
+
+        // Load Radius (Persistence)
+        const storedRadius = await AsyncStorage.getItem("user_radius");
+        if (storedRadius) {
+          setRadiusState(parseInt(storedRadius, 10));
+        }
+
         setLoading(false);
       } catch (error) {
-        console.error('Error loading stored location:', error);
+        console.error('Error loading stored data:', error);
         setLoading(false);
       }
     })();
@@ -42,6 +58,16 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
       await AsyncStorage.setItem("user_location", JSON.stringify(loc));
     } catch (error) {
       console.error('Error saving location:', error);
+    }
+  };
+
+  // ✨ NEW: Wrapper to save radius to storage when changed
+  const setRadius = async (newRadius: number) => {
+    setRadiusState(newRadius);
+    try {
+        await AsyncStorage.setItem("user_radius", newRadius.toString());
+    } catch (error) {
+        console.error("Error saving radius:", error);
     }
   };
 
@@ -95,6 +121,8 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
         loading,
         requestCurrentLocation,
         setManualLocation,
+        radius,    // Exported
+        setRadius, // Exported
       }}
     >
       {children}

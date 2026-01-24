@@ -43,13 +43,9 @@ export const Business = {
   name: v.string(),
   business_name: v.optional(v.string()),
   typeId: v.id("businessTypes"),
-  location: v.optional(
-    v.object({
-      address: v.string(),
-      lat: v.float64(),
-      lng: v.float64(),
-    })
-  ),
+  lat: v.optional(v.float64()),
+  lng: v.optional(v.float64()),
+  location: v.optional(v.string()),
   profileImage: v.optional(v.string()),
   profileImagePublicId: v.optional(v.string()),
 
@@ -106,7 +102,8 @@ export default defineSchema({
   businesses: defineTable(Business)
     .index("by_ownerId", ["ownerId"])
     .index("by_typeId", ["typeId"])
-    .index("by_business_name", ["business_name"]),
+    .index("by_business_name", ["business_name"])
+    .index("by_type_lat", ["typeId", "lat"]),
 
   businessTypes: defineTable(BusinessType)
     .index("by_slug", ["slug"])

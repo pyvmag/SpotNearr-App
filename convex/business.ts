@@ -30,19 +30,66 @@ export const getExploreData = query({
 
 
 
-export const getBusinessesByType = query({
+function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; 
+}
+
+export const getBusinessesByTypeAndLocation = query({
   args: { 
-    typeId: v.id("businessTypes") 
+    typeId: v.id("businessTypes"),
+    userLat: v.optional(v.float64()),
+    userLng: v.optional(v.float64()),
+    radius: v.optional(v.number()), // Radius in Km (default 1)
   },
   handler: async (ctx, args) => {
-    // 1. Fetch all businesses matching the type
-    // Note: You should add an index on "typeId" in your schema for performance
-    const businesses = await ctx.db
+    // 1. Safety Check: If location is missing, return empty list
+    if (!args.userLat || !args.userLng) {
+      return []; 
+    }
+
+    const radius = args.radius ?? 1;
+    
+    // 2. Calculate the "Bounding Box" for Latitude
+    const latDegrees = radius / 111.32; 
+    const minLat = args.userLat - latDegrees;
+    const maxLat = args.userLat + latDegrees;
+
+    // 3. DATABASE QUERY (Fast Filter)
+    const candidates = await ctx.db
       .query("businesses")
-      .withIndex("by_typeId", (q) => q.eq("typeId", args.typeId))
+      .withIndex("by_type_lat", (q) => 
+        q.eq("typeId", args.typeId)
+         .gte("lat", minLat)
+         .lte("lat", maxLat)
+      )
       .collect();
 
-    return businesses;
+    // 4. MEMORY FILTER (Precise Filter)
+    const nearbyBusinesses = candidates.map((b) => {
+
+       const distance = (b.lat && b.lng) 
+         ? getDistanceFromLatLonInKm(
+             args.userLat!,
+             args.userLng!,
+             b.lat,
+             b.lng
+           ) 
+         : Infinity;
+
+       return { ...b, distance };
+    })
+    .filter((b) => b.distance <= radius) // Infinity will fail this check
+    .sort((a, b) => a.distance - b.distance); // Sort: Nearest first
+
+    return nearbyBusinesses;
   },
 });
 
@@ -108,13 +155,9 @@ export const createBusiness = mutation({
     name: v.string(),
     business_name: v.string(),
     typeId: v.id("businessTypes"),
-    location: v.optional(
-      v.object({
-        address: v.string(),
-        lat: v.float64(),
-        lng: v.float64(),
-      })
-    ),
+    lat: v.float64(),
+    lng: v.float64(),
+    location: v.optional(v.string()),
     address: v.optional(v.string()),
     bio: v.optional(v.string()),
   },
@@ -146,6 +189,8 @@ export const createBusiness = mutation({
       name: args.name,
       business_name: businessName,
       typeId: args.typeId,
+      lat: args.lat,
+      lng: args.lng,
       location: args.location,
       address: args.address,
       bio: args.bio,

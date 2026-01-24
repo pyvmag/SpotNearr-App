@@ -31,7 +31,7 @@ export default function CreateBusinessScreen() {
 
   // --- Form State ---
   const [businessName, setBusinessName] = useState("");
-  const [uniqueBusinessName, setUniqueBusinessName] = useState(""); // The unique handle
+  const [uniqueBusinessName, setUniqueBusinessName] = useState(""); 
   const [bio, setBio] = useState("");
   const [detailedAddress, setDetailedAddress] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<Id<"businessCategories"> | null>(null);
@@ -45,7 +45,6 @@ export default function CreateBusinessScreen() {
     isCheckingAvailability ? { business_name: uniqueBusinessName } : "skip"
   );
 
-  // Auto-suggest unique name based on display name
   useEffect(() => {
     if (businessName && !uniqueBusinessName) {
       const suggested = businessName
@@ -61,6 +60,8 @@ export default function CreateBusinessScreen() {
   const [locationQuery, setLocationQuery] = useState("");
   const [locationResults, setLocationResults] = useState<any[]>([]);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  
+  // Stores the clean coordinates and formatted address
   const [selectedLocation, setSelectedLocation] = useState<{
     address: string;
     lat: number;
@@ -84,18 +85,13 @@ export default function CreateBusinessScreen() {
     }
     const handler = setTimeout(async () => {
       try {
-        if (!OPENCAGE_API_KEY || OPENCAGE_API_KEY === "your_opencage_api_key_here") {
-          console.warn("OpenCage API key not configured");
-          return;
-        }
+        if (!OPENCAGE_API_KEY) return;
         const res = await fetch(
           `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(locationQuery)}&key=${OPENCAGE_API_KEY}&limit=5&countrycode=in`
         );
         const data = await res.json();
-        if (data.status && data.status.code === 200) {
+        if (data.status?.code === 200) {
           setLocationResults(data.results || []);
-        } else {
-          console.error("OpenCage API error:", data.status);
         }
       } catch (err) { 
         console.error("Location search error:", err); 
@@ -110,16 +106,13 @@ export default function CreateBusinessScreen() {
       setSelectedLocation(undefined);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        alert("Location permission denied. Please enable location permissions in your device settings.");
+        alert("Location permission denied.");
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({ 
-        accuracy: Location.Accuracy.High,
-      });
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
 
-      if (!OPENCAGE_API_KEY || OPENCAGE_API_KEY === "your_opencage_api_key_here") {
-        // Fallback: use coordinates directly if API key is not configured
+      if (!OPENCAGE_API_KEY) {
         setSelectedLocation({
           address: `Lat: ${loc.coords.latitude.toFixed(6)}, Lng: ${loc.coords.longitude.toFixed(6)}`,
           lat: loc.coords.latitude,
@@ -134,58 +127,57 @@ export default function CreateBusinessScreen() {
       const data = await res.json();
       const result = data.results?.[0];
 
-      if (result) {
-        setSelectedLocation({
-          address: result.formatted,
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude
-        });
-      } else {
-        // Fallback to coordinates if reverse geocoding fails
-        setSelectedLocation({
-          address: `Lat: ${loc.coords.latitude.toFixed(6)}, Lng: ${loc.coords.longitude.toFixed(6)}`,
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude
-        });
-      }
+      setSelectedLocation({
+        address: result ? result.formatted : "Current Location",
+        lat: loc.coords.latitude,
+        lng: loc.coords.longitude
+      });
+      
     } catch (e) { 
       console.error("Location error:", e);
-      alert("Failed to get location. Please ensure location services are enabled and try again."); 
+      alert("Failed to get location."); 
     } finally { 
       setIsFetchingLocation(false); 
     }
   };
 
   const handleContinue = async () => {
+    // Step 1 Validation
     if (step === 1) {
       if (!businessName || !selectedLocation || availabilityResult !== true) return;
       setStep(2);
       return;
     }
 
+    // Step 2 Validation & Submission
     if (!userProfile || !selectedTypeId) return;
 
     setIsLoading(true);
     try {
+      // ✅ OPTIMIZED: Flattened Args for new Schema
       const newBusinessId = await createBusiness({
         ownerId: userProfile._id,
         name: businessName.trim(),
         business_name: uniqueBusinessName.trim().toLowerCase(),
         typeId: selectedTypeId,
-        location: selectedLocation,
+        
+        // 🚀 New Location Fields (Top Level)
+        lat: selectedLocation!.lat,
+        lng: selectedLocation!.lng,
+        // Use manual address if typed, otherwise use GPS address
+        address: detailedAddress.trim() ? detailedAddress.trim() : selectedLocation!.address,
+        
         bio: bio.trim(),
-        address: detailedAddress.trim(),
       });
 
-      await updateUserProfile({
-        role: "service_provider",
-      });
+      await updateUserProfile({ role: "service_provider" });
       
-      // Set the newly created business as the active business
       if (setActiveBusinessId) await setActiveBusinessId(newBusinessId);
       if (setMode) await setMode("business");
       router.replace("/profile");
+      
     } catch (e) {
+      console.error("Create Business Error:", e);
       alert("Error creating business profile.");
     } finally {
       setIsLoading(false);
@@ -226,7 +218,7 @@ export default function CreateBusinessScreen() {
             <View>
               <Input label="Business Name" value={businessName} onChange={setBusinessName} placeholder="e.g. Urban Cafe" />
 
-              {/* UNIQUE BUSINESS NAME (HANDLE) FIELD */}
+              {/* UNIQUE BUSINESS NAME (HANDLE) */}
               <View className="mb-6">
                 <Text className="font-semibold mb-2 text-gray-700">Business ID (Unique)</Text>
                 <View className="relative">
