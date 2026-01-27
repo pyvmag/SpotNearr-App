@@ -11,7 +11,6 @@ export const getReviews = query({
       .order("desc")
       .collect();
 
-    // Enrich with user details (name/avatar)
     return Promise.all(
       reviews.map(async (r) => {
         const user = await ctx.db.get(r.userId);
@@ -21,7 +20,6 @@ export const getReviews = query({
   },
 });
 
-// 2. Submit Review & Update Average
 export const submitReview = mutation({
   args: {
     businessId: v.id("businesses"),

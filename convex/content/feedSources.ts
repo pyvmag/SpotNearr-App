@@ -26,7 +26,7 @@ export async function getFavoriteFeedSourceInternal(
       )
       .filter((q) =>
         q.and(
-          q.lt(q.field("createdAt"), cursor), // 👈 cursor paging
+          q.lt(q.field("createdAt"), cursor),
           q.gte(q.field("createdAt"), cutoff)
         )
       )

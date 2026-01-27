@@ -8,13 +8,15 @@ import { useQuery } from "convex/react";
 import { useContext, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import SwitchProfileModal from "./SwitchProfileModal";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // 1. Import this
+import { useRouter } from "expo-router"; // 2. Import this
 
 export default function ProfileHeader({ userProfile }: { userProfile: any }) {
-  // 1. Pull activeBusinessId from context
+  const router = useRouter(); // 3. Get Router
   const { mode, activeBusinessId } = useContext(ModeContext) as any;
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 2. Fetch the SPECIFIC business currently selected
+  // Fetch the SPECIFIC business currently selected
   const business = useQuery(
     api.business.getBusinessById, 
     (mode === "business" && activeBusinessId) 
@@ -22,25 +24,37 @@ export default function ProfileHeader({ userProfile }: { userProfile: any }) {
       : "skip"
   );
 
-  // 3. Determine the name to display
   const displayName = mode === "business" 
     ? (business?.name || "Loading Business...") 
     : userProfile?.name;
 
+  // 4. UPDATED LOGOUT FUNCTION
   const handleSignOut = async () => {
     try {
+      // A. Clear the "Last Known State" so the app knows we INTENTIONALLY logged out
+      await AsyncStorage.setItem("wasLoggedIn", "false");
+
+      // B. Sign out from Convex
       await authClient.signOut({
         fetchOptions: {
           onSuccess: () => {
             console.log('Successfully signed out');
+            // C. Force redirect to Auth Screen
+            router.replace("/(auth)");
           },
           onError: (error) => {
             console.error("Sign out error:", error);
+            // Even if server error, we should probably force local logout
+            AsyncStorage.setItem("wasLoggedIn", "false");
+            router.replace("/(auth)");
           }
         }
       });
     } catch (error) {
       console.error("Error signing out:", error);
+      // Fallback: Force logout anyway
+      await AsyncStorage.setItem("wasLoggedIn", "false");
+      router.replace("/(auth)");
     }
   };
 
@@ -56,7 +70,6 @@ export default function ProfileHeader({ userProfile }: { userProfile: any }) {
       </View>
 
       <View className="flex-row items-center space-x-2">
-        {/* Quick action for Business Mode (Optional: Create Post/Offer) */}
         {mode === "business" && (
            <TouchableOpacity className="p-2 bg-emerald-50 rounded-full mr-2">
              <Ionicons name="add" size={20} color="#10B981" />

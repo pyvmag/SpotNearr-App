@@ -29,7 +29,7 @@ export default function FavoritesCarousel({ favorites }: { favorites: any[] }) {
           >
             <View className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border border-gray-100 shadow-sm">
               <Image 
-                source={{ uri: business.logoUrl || "https://via.placeholder.com/150" }} 
+                source={{ uri: business.profileImage || "https://via.placeholder.com/150" }} 
                 className="w-full h-full"
               />
             </View>

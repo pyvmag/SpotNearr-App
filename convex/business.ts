@@ -1,3 +1,4 @@
+import { Id, Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
@@ -6,90 +7,106 @@ export const getExploreData = query({
   handler: async (ctx) => {
     const categories = await ctx.db
       .query("businessCategories")
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .withIndex("by_isActive", q => q.eq("isActive", true))
+      .take(20);
 
-    const groupedData = await Promise.all(
+    if (!categories.length) return [];
+
+    const data = await Promise.all(
       categories.map(async (category) => {
         const types = await ctx.db
           .query("businessTypes")
-          .withIndex("by_categoryId", (q) => q.eq("categoryId", category._id))
-          .filter((q) => q.eq(q.field("isActive"), true))
-          .collect();
+          .withIndex("by_category_active", q =>
+            q.eq("categoryId", category._id).eq("isActive", true)
+          )
+          .take(20);
 
         return {
-          ...category,
-          types, 
+          _id: category._id,
+          name: category.name,
+          slug: category.slug,
+          types,
         };
       })
     );
-
-    return groupedData.filter((cat) => cat.types.length > 0);
+    return data.filter(c => c.types.length > 0);
   },
 });
 
 
-
-function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Radius of the earth in km
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // km
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; 
+  return R * c;
 }
 
-export const getBusinessesByTypeAndLocation = query({
-  args: { 
+export const getBusinessesPaginated = query({
+  args: {
     typeId: v.id("businessTypes"),
-    userLat: v.optional(v.float64()),
-    userLng: v.optional(v.float64()),
-    radius: v.optional(v.number()), // Radius in Km (default 1)
+    userLat: v.number(),
+    userLng: v.number(),
+    radius: v.number(),          // max radius in km
+    sortBy: v.string(),          // "distance" or "rating"
+    offset: v.optional(v.number()), // numeric offset for pagination
+    pageSize: v.optional(v.number()), // default 50
   },
   handler: async (ctx, args) => {
-    // 1. Safety Check: If location is missing, return empty list
-    if (!args.userLat || !args.userLng) {
-      return []; 
-    }
+    const { typeId, userLat, userLng, radius, sortBy } = args;
+    const pageSize = args.pageSize ?? 50;
+    const offset = args.offset ?? 0;
 
-    const radius = args.radius ?? 1;
-    
-    // 2. Calculate the "Bounding Box" for Latitude
-    const latDegrees = radius / 111.32; 
-    const minLat = args.userLat - latDegrees;
-    const maxLat = args.userLat + latDegrees;
+    // Step 1: Bounding Box Optimization
+    const latDegrees = radius / 111.32;
+    const minLat = userLat - latDegrees;
+    const maxLat = userLat + latDegrees;
 
-    // 3. DATABASE QUERY (Fast Filter)
+    // Step 2: Fetch Candidates (Hard Limit 500)
     const candidates = await ctx.db
       .query("businesses")
-      .withIndex("by_type_lat", (q) => 
-        q.eq("typeId", args.typeId)
+      .withIndex("by_type_lat", (q) =>
+        q.eq("typeId", typeId)
          .gte("lat", minLat)
          .lte("lat", maxLat)
       )
-      .collect();
+      .take(500);
 
-    // 4. MEMORY FILTER (Precise Filter)
-    const nearbyBusinesses = candidates.map((b) => {
+    // Step 3: Compute Distance & Filter by Radius
+    const filtered = candidates
+      .map((b) => ({ ...b, distance: getDistance(userLat, userLng, b.lat, b.lng) }))
+      .filter((b) => b.distance <= radius);
 
-       const distance = (b.lat && b.lng) 
-         ? getDistanceFromLatLonInKm(
-             args.userLat!,
-             args.userLng!,
-             b.lat,
-             b.lng
-           ) 
-         : Infinity;
+    // Step 4: Sort by Distance or Rating
+    if (sortBy === "rating") {
+      filtered.sort((a, b) => {
+        if ((b.rating ?? 0) === (a.rating ?? 0)) return a._id.localeCompare(b._id);
+        return (b.rating ?? 0) - (a.rating ?? 0);
+      });
+    } else {
+      filtered.sort((a, b) => {
+        if (Math.abs(a.distance - b.distance) < 0.0001) return a._id.localeCompare(b._id);
+        return a.distance - b.distance;
+      });
+    }
 
-       return { ...b, distance };
-    })
-    .filter((b) => b.distance <= radius) // Infinity will fail this check
-    .sort((a, b) => a.distance - b.distance); // Sort: Nearest first
+    // Step 5: Slice Page for Numeric Offset
+    const page = filtered.slice(offset, offset + pageSize);
 
-    return nearbyBusinesses;
+    // Step 6: Determine Next Offset
+    const nextOffset = offset + pageSize;
+    const hasMore = nextOffset < filtered.length;
+
+    return {
+      page,
+      nextOffset: hasMore ? nextOffset : null,
+      isDone: !hasMore,
+    };
   },
 });
 
@@ -143,7 +160,7 @@ export const getBusinessesByOwner = query({
     return await ctx.db
       .query("businesses")
       .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
-      .collect();
+      .take(20);
   },
 });
 
@@ -220,7 +237,7 @@ export const getBusinessTypes = query({
     return await ctx.db
       .query("businessTypes")
       .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .take(20);
   },
 });
 
@@ -230,7 +247,7 @@ export const getBusinessCategories = query({
     return ctx.db
       .query("businessCategories")
       .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .take(20);
   },
 });
 
@@ -243,7 +260,7 @@ export const getBusinessTypesByCategory = query({
         q.eq("categoryId", categoryId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .take(20);
   },
 });
 

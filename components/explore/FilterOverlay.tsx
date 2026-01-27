@@ -15,7 +15,7 @@ interface FilterOverlayProps {
   onClose: () => void;
 }
 
-const DISTANCE_OPTIONS = [1, 2, 5, 10, 15, 20, 30, 50];
+const DISTANCE_OPTIONS = [1, 2, 5, 10, 15, 20];
 
 export const FilterOverlay = ({
   visible,
@@ -25,7 +25,6 @@ export const FilterOverlay = ({
 }: FilterOverlayProps) => {
   const [localRadius, setLocalRadius] = useState(radius);
 
-  // Sync local state only when modal opens
   useEffect(() => {
     if (visible) {
       setLocalRadius(radius);

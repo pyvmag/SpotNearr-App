@@ -11,14 +11,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-
+import { SafeAreaView } from "react-native-safe-area-context";
 const OPENCAGE_API_KEY = process.env.EXPO_PUBLIC_OPENCAGE_KEY || "";
 
 export default function CreateBusinessScreen() {
@@ -68,7 +67,6 @@ export default function CreateBusinessScreen() {
     lng: number;
   } | undefined>(undefined);
 
-  // --- Convex ---
   const categories = useQuery(api.business.getBusinessCategories);
   const subTypes = useQuery(
     api.business.getBusinessTypesByCategory,
@@ -187,7 +185,7 @@ export default function CreateBusinessScreen() {
   const isStep1Valid = businessName && selectedLocation && availabilityResult === true;
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView edges={['top']} className="flex-1 bg-white">
       {/* HEADER */}
       <View className="px-6 py-6 flex-row justify-between items-center border-b border-gray-50">
         <TouchableOpacity onPress={() => step === 1 ? router.back() : setStep(1)} className="p-2">

@@ -1,21 +1,14 @@
 import { api } from "@/convex/_generated/api";
 import { useUserLocation } from "@/src/context/LocationContext";
-import { LocationHeader } from "@/components/explore/location-header";
-import { Feather, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "convex/react";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+// Import Components
 import { CategoryRail } from "@/components/explore/CategoryRail";
+import { ExploreHeader } from "@/components/explore/ExploreHeader";
 import { FilterOverlay } from "@/components/explore/FilterOverlay";
+import { LocationModal } from "@/components/explore/LocationModal";
 
 export default function ExploreScreen() {
   const {
@@ -27,83 +20,64 @@ export default function ExploreScreen() {
   } = useUserLocation();
 
   const categories = useQuery(api.business.getExploreData);
+
+  // State for Modals
   const [isFilterVisible, setFilterVisible] = useState(false);
+  const [isLocationVisible, setLocationVisible] = useState(false);
 
   useEffect(() => {
-    if (!location) requestCurrentLocation();
+    if (!location && !locationLoading) {
+      requestCurrentLocation();
+    }
   }, [location]);
 
-  if (locationLoading || !categories) {
+  if (categories === undefined) {
     return (
       <View className="flex-1 items-center justify-center bg-[#F8F9FB]">
         <ActivityIndicator size="large" color="#059669" />
+        <Text className="mt-4 text-slate-500 font-medium">Loading local spots...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8F9FB] relative">
-      {/* REMOVED Stack.Screen - this was causing the error */}
-      
+    <View className="flex-1 bg-white">
+      <ExploreHeader
+        locationLabel={locationLoading ? "Locating..." : location?.label || "Select Location"}
+        radius={radius}
+        onPressLocation={() => setLocationVisible(true)}
+        onPressFilter={() => setFilterVisible(true)}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
       >
-        {/* Header */}
-        <View className="px-5 pt-6 pb-2">
-          <LocationHeader label={location?.label} />
-          <Text className="text-3xl font-extrabold text-slate-900 mt-4">
-            {`Discover `}
-            <Text className="text-emerald-600">{`Local.`}</Text>
-          </Text>
-        </View>
-
-        {/* Search & Filter Button */}
-        <View className="px-5 mt-4 mb-8 flex-row items-center gap-3">
-          <View className="flex-1 flex-row items-center bg-white h-12 px-4 rounded-2xl border border-slate-200 shadow-sm">
-            <Ionicons name="search" size={20} color="#94a3b8" />
-            <TextInput
-              placeholder="Search businesses..."
-              className="flex-1 ml-2 font-medium text-slate-700"
-              placeholderTextColor="#94a3b8"
-            />
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setFilterVisible(true)}
-            className="h-12 w-12 bg-emerald-600 rounded-2xl items-center justify-center shadow-md shadow-emerald-200"
-          >
-            <Feather name="sliders" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Active Filter Indicator */}
-        {radius !== 5 && (
-          <View className="px-5 mb-6">
-            <View className="self-start bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full flex-row items-center">
-              <Text className="text-emerald-700 text-xs font-bold">
-                {`Filtered: Within ${radius}km`}
-              </Text>
-            </View>
+        {/* Categories & Types Rails */}
+        {categories.length > 0 ? (
+          categories.map((category) => (
+            <CategoryRail key={category._id} category={category} />
+          ))
+        ) : (
+          <View className="px-5 py-10 items-center">
+            <Text className="text-slate-400">No categories found in your area.</Text>
           </View>
         )}
-
-        {/* Categories */}
-        {categories.map((category) => (
-          <CategoryRail key={category._id} category={category} />
-        ))}
-
-        <View className="h-20" />
       </ScrollView>
 
-      {/* Filter Overlay */}
+      {/* 2. Modals */}
       <FilterOverlay
         visible={isFilterVisible}
         radius={radius}
         setRadius={setRadius}
         onClose={() => setFilterVisible(false)}
       />
-    </SafeAreaView>
+
+      <LocationModal
+        visible={isLocationVisible}
+        onClose={() => setLocationVisible(false)}
+      />
+
+    </View>
   );
 }
