@@ -7,7 +7,6 @@ import { Ionicons } from "@expo/vector-icons";
 // Import Components
 import { CategoryRail } from "@/components/explore/CategoryRail";
 import { ExploreHeader } from "@/components/explore/ExploreHeader";
-import { FilterOverlay } from "@/components/explore/FilterOverlay";
 import { LocationModal } from "@/components/explore/LocationModal";
 
 export default function ExploreScreen() {
@@ -64,15 +63,7 @@ export default function ExploreScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* 2. Modals */}
-      <FilterOverlay
-        visible={isFilterVisible}
-        radius={radius}
-        setRadius={setRadius}
-        onClose={() => setFilterVisible(false)}
-      />
-
+      
       <LocationModal
         visible={isLocationVisible}
         onClose={() => setLocationVisible(false)}

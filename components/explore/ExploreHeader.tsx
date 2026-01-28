@@ -66,25 +66,6 @@ export const ExploreHeader = ({
             {/* Chevron */}
             <Ionicons name="chevron-down" size={16} color="#94a3b8" style={{marginLeft: 4}} />
           </TouchableOpacity>
-
-          {/* RADIUS CHIP (Takes 30% width) */}
-          <TouchableOpacity
-            onPress={onPressFilter}
-            className="flex-0.8 flex-row items-center bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl active:bg-emerald-100"
-          >
-            <View className="bg-emerald-100 p-1.5 rounded-full mr-2">
-              <Feather name="target" size={14} color="#059669" />
-            </View>
-            <View>
-              <Text className="text-[8px] uppercase text-emerald-500 font-bold tracking-wider">
-                Within
-              </Text>
-              <Text className="text-sm font-bold text-slate-800">
-                {radius} km
-              </Text>
-            </View>
-            <Ionicons name="chevron-down" size={16} color="#94a3b8" className="ml-2"/>
-          </TouchableOpacity>
           
         </View>
       </SafeAreaView>

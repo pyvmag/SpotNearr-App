@@ -1,22 +1,28 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
-// 1. Get Reviews for a Business
 export const getReviews = query({
-  args: { businessId: v.id("businesses") },
+  args: { 
+    businessId: v.id("businesses"),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
-    const reviews = await ctx.db
+    const reviewsPage = await ctx.db
       .query("reviews")
       .withIndex("by_business", (q) => q.eq("businessId", args.businessId))
-      .order("desc")
-      .collect();
+      .order("desc") // Show newest first
+      .paginate(args.paginationOpts);
 
-    return Promise.all(
-      reviews.map(async (r) => {
+    // Map authors to the reviews in this specific page
+    const reviewsWithAuthors = await Promise.all(
+      reviewsPage.page.map(async (r) => {
         const user = await ctx.db.get(r.userId);
         return { ...r, author: user };
       })
     );
+
+    return { ...reviewsPage, page: reviewsWithAuthors };
   },
 });
 
@@ -30,14 +36,16 @@ export const submitReview = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    // Get the user from your database
     const user = await ctx.db
       .query("users")
       .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
-      .first();
+      .unique();
     if (!user) throw new Error("User not found");
 
-    // A. Save the Review
+    const business = await ctx.db.get(args.businessId);
+    if (!business) throw new Error("Business not found");
+
+    // 1. Save the New Review
     await ctx.db.insert("reviews", {
       userId: user._id,
       businessId: args.businessId,
@@ -46,19 +54,21 @@ export const submitReview = mutation({
       createdAt: Date.now(),
     });
 
-    // B. Recalculate Business Average (Simple Math)
-    const allReviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_business", (q) => q.eq("businessId", args.businessId))
-      .collect();
+    // 2. Math for Rating & Score
+    const newCount = (business.reviewCount ?? 0) + 1;
+    const currentTotalStars = (business.rating ?? 0) * (business.reviewCount ?? 0);
+    const newAverageRating = (currentTotalStars + args.rating) / newCount;
 
-    const totalStars = allReviews.reduce((sum, r) => sum + r.rating, 0);
-    const newRating = totalStars / allReviews.length;
+    // YOUR SMART SCORE FORMULA: (Rating * 10) + ReviewCount
+    const newRecommendationScore = (newAverageRating * 10) + newCount;
 
-    // C. Update the Business
+    // 3. Single Patch to update everything
     await ctx.db.patch(args.businessId, {
-      rating: parseFloat(newRating.toFixed(1)), // Keep it to 1 decimal (e.g. 4.8)
-      reviewCount: allReviews.length,
+      rating: parseFloat(newAverageRating.toFixed(1)),
+      reviewCount: newCount,
+      recommendationScore: newRecommendationScore,
     });
+
+    return { success: true };
   },
 });

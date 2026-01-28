@@ -1,6 +1,7 @@
-import { Id, Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { encodeGeohash } from "./geohash";
+import { paginationOptsValidator } from "convex/server";
 
 export const getExploreData = query({
   args: {},
@@ -34,81 +35,48 @@ export const getExploreData = query({
 });
 
 
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-export const getBusinessesPaginated = query({
+export const getBusinessesByScore = query({
+  // Only define the filters you are passing from the frontend
   args: {
     typeId: v.id("businessTypes"),
-    userLat: v.number(),
-    userLng: v.number(),
-    radius: v.number(),          // max radius in km
-    sortBy: v.string(),          // "distance" or "rating"
-    offset: v.optional(v.number()), // numeric offset for pagination
-    pageSize: v.optional(v.number()), // default 50
+    geohash: v.string(),
+    level: v.union(v.literal(6), v.literal(5)),
+    paginationOpts: paginationOptsValidator, // Use the official validator from convex/server
   },
   handler: async (ctx, args) => {
-    const { typeId, userLat, userLng, radius, sortBy } = args;
-    const pageSize = args.pageSize ?? 50;
-    const offset = args.offset ?? 0;
+    const indexName = args.level === 6 ? "by_type_geo6_score" : "by_type_geo5_score";
+    const hashField = args.level === 6 ? "geohash_6" : "geohash_5";
 
-    // Step 1: Bounding Box Optimization
-    const latDegrees = radius / 111.32;
-    const minLat = userLat - latDegrees;
-    const maxLat = userLat + latDegrees;
-
-    // Step 2: Fetch Candidates (Hard Limit 500)
-    const candidates = await ctx.db
+    return await ctx.db
       .query("businesses")
-      .withIndex("by_type_lat", (q) =>
-        q.eq("typeId", typeId)
-         .gte("lat", minLat)
-         .lte("lat", maxLat)
+      .withIndex(indexName, (q) =>
+        q.eq("typeId", args.typeId).eq(hashField as any, args.geohash)
       )
-      .take(500);
-
-    // Step 3: Compute Distance & Filter by Radius
-    const filtered = candidates
-      .map((b) => ({ ...b, distance: getDistance(userLat, userLng, b.lat, b.lng) }))
-      .filter((b) => b.distance <= radius);
-
-    // Step 4: Sort by Distance or Rating
-    if (sortBy === "rating") {
-      filtered.sort((a, b) => {
-        if ((b.rating ?? 0) === (a.rating ?? 0)) return a._id.localeCompare(b._id);
-        return (b.rating ?? 0) - (a.rating ?? 0);
-      });
-    } else {
-      filtered.sort((a, b) => {
-        if (Math.abs(a.distance - b.distance) < 0.0001) return a._id.localeCompare(b._id);
-        return a.distance - b.distance;
-      });
-    }
-
-    // Step 5: Slice Page for Numeric Offset
-    const page = filtered.slice(offset, offset + pageSize);
-
-    // Step 6: Determine Next Offset
-    const nextOffset = offset + pageSize;
-    const hasMore = nextOffset < filtered.length;
-
-    return {
-      page,
-      nextOffset: hasMore ? nextOffset : null,
-      isDone: !hasMore,
-    };
+      .order("desc") // Show highest Recommendation Score first
+      .paginate(args.paginationOpts); 
   },
 });
+export const updateBusinessScore = mutation({
+  args: { businessId: v.id("businesses"), rating: v.number() },
+  handler: async (ctx, args) => {
+    const business = await ctx.db.get(args.businessId);
+    if (!business) return;
+
+    const newCount = (business.reviewCount ?? 0) + 1;
+    const newRating = ((business.rating ?? 0) * (business.reviewCount ?? 0) + args.rating) / newCount;
+    
+    // SMART SCORE FORMULA: (Rating * 10) + (ReviewCount)
+    // This makes sure active shops rise to the top of the neighborhood
+    const newScore = (newRating * 10) + newCount;
+
+    await ctx.db.patch(args.businessId, {
+      rating: newRating,
+      reviewCount: newCount,
+      recommendationScore: newScore,
+    });
+  },
+});
+
 
 export const getBusinessByOwnerId = query({
   args: { 
@@ -179,6 +147,8 @@ export const createBusiness = mutation({
     bio: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const g6 = encodeGeohash(args.lat, args.lng, 6);
+    const g5 = g6.substring(0, 5);
     const businessName = args.business_name.toLowerCase();
 
     // 1. Format Validation
@@ -212,6 +182,9 @@ export const createBusiness = mutation({
       address: args.address,
       bio: args.bio,
       createdAt: Date.now(),
+      geohash_6: g6,
+      geohash_5: g5,
+      recommendationScore: 0,
     });
   },
 });

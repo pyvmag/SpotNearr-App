@@ -17,6 +17,7 @@ import type * as content_getFavoriteFeedSource from "../content/getFavoriteFeedS
 import type * as content_getFeed from "../content/getFeed.js";
 import type * as content_helpers from "../content/helpers.js";
 import type * as favourites from "../favourites.js";
+import type * as geohash from "../geohash.js";
 import type * as http from "../http.js";
 import type * as lib_cloudinary from "../lib/cloudinary.js";
 import type * as lib_cloudinaryUtils from "../lib/cloudinaryUtils.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "content/getFeed": typeof content_getFeed;
   "content/helpers": typeof content_helpers;
   favourites: typeof favourites;
+  geohash: typeof geohash;
   http: typeof http;
   "lib/cloudinary": typeof lib_cloudinary;
   "lib/cloudinaryUtils": typeof lib_cloudinaryUtils;

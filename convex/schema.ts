@@ -54,8 +54,11 @@ export const Business = {
   address: v.optional(v.string()),
   bio: v.optional(v.string()),
   createdAt: v.number(),
-  rating: v.optional(v.number()),      // e.g. 4.8
+  rating: v.optional(v.number()),
   reviewCount: v.optional(v.number()),
+  geohash_6: v.string(),
+  geohash_5: v.string(),
+  recommendationScore: v.number(),
 };
 
 export const Content = {
@@ -114,7 +117,9 @@ export default defineSchema({
     .index("by_ownerId", ["ownerId"])
     .index("by_typeId", ["typeId"])
     .index("by_business_name", ["business_name"])
-    .index("by_type_lat", ["typeId", "lat"]),
+    .index("by_type_lat", ["typeId", "lat"])
+    .index("by_type_geo6_score", ["typeId", "geohash_6", "recommendationScore"])
+    .index("by_type_geo5_score", ["typeId", "geohash_5", "recommendationScore"]),
 
   businessTypes: defineTable(BusinessType)
     .index("by_slug", ["slug"])
