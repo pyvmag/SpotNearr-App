@@ -21,22 +21,27 @@ export default function FeedCard({
     <View className="bg-white mb-4 rounded-3xl overflow-hidden">
       {/* Header */}
       <View className="flex-row items-center px-4 py-3">
-        <View className="p-[1px] border border-emerald-500 rounded-full">
+        <View className={`p-[1px] border rounded-full ${business?.isCelebrity ? "border-purple-500" : "border-emerald-500"}`}>
           <Image
             source={{
-              uri: business?.logoUrl || "https://via.placeholder.com/100",
+              uri: business?.logoUrl || business?.profileImage || "https://via.placeholder.com/100",
             }}
             className="w-9 h-9 rounded-full bg-gray-100"
           />
         </View>
         <View className="ml-3 flex-1">
           <Text className="font-bold text-slate-900 text-sm">
-            {business?.name}
+            {business?.name || "Business"}
           </Text>
           <Text className="text-gray-500 text-[10px]">
-            {business?.address || "Nearby"}
+            {business?.isCelebrity ? "Celebrity" : "Local Business"}
           </Text>
         </View>
+        {business?.isCelebrity && (
+          <View className="bg-purple-100 px-2 py-1 rounded-full">
+            <Text className="text-purple-600 text-[10px] font-semibold">VIP</Text>
+          </View>
+        )}
       </View>
 
       {/* Image */}
@@ -104,7 +109,7 @@ export default function FeedCard({
       {/* Timestamp */}
       <View className="px-6 pb-4">
         <Text className="text-gray-400 text-[10px] uppercase">
-          {new Date(content._creationTime).toLocaleDateString("en-IN", {
+          {new Date(content.createdAt).toLocaleDateString("en-IN", {
             day: "numeric",
             month: "short",
             year: "numeric",

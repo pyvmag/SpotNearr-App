@@ -21,7 +21,13 @@ export const toggleFavorite = mutation({
       });
       return false;
     } else {
-      await ctx.db.insert("favorites", { userId: args.userId, businessId: args.businessId });
+      const business = await ctx.db.get(args.businessId);
+      await ctx.db.insert("favorites", { 
+        userId: args.userId, 
+        businessId: args.businessId,
+        isCelebrity: business?.isCelebrity ?? false,
+        affinityScore: 0 // Default score, can be updated later by affinity calculation
+      });
       // Increase count
       await ctx.db.patch(args.userId, { 
         favoritesCount: currentCount + 1 
