@@ -163,6 +163,8 @@ export const Content = {
 
   isCelebrity: v.boolean(),
 
+  lastDecayFactor: v.optional(v.number()), // Track last applied decay factor
+
 };
 
 

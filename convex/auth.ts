@@ -14,22 +14,22 @@ export const authComponent = createClient<DataModel>(components.betterAuth);
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     trustedOrigins: ["spotnearr://",
-        "exp://595s90w-shrey2711-8081.exp.direct",
-        "exp://qf7vdl4-anonymous-8081.exp.direct",
-        "https://spotnearr.in",
-        "exp+spotnearr://expo-development-client/?url=https%3A%2F%2F595s90w-shrey2711-8081.exp.direct"
+      "exp://595s90w-shrey2711-8081.exp.direct",
+      "exp://qf7vdl4-anonymous-8081.exp.direct",
+      "https://spotnearr.in",
+      "exp+spotnearr://expo-development-client/?url=https%3A%2F%2F595s90w-shrey2711-8081.exp.direct"
     ],
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
     },
-    baseURL: process.env.EXPO_PUBLIC_CONVEX_SITE_URL, 
+    baseURL: process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
     socialProviders: {
-        google: { 
-            clientId: process.env.GOOGLE_CLIENT_ID as string, 
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string, 
-        }, 
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID as string,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      },
     },
     plugins: [
       // The Expo and Convex plugins are required
