@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { encodeGeohash } from "./geohash";
+import { encodeGeohash, getGeohashNeighbors } from "./geohash";
 import { paginationOptsValidator } from "convex/server";
 
 export const getExploreData = query({
@@ -34,7 +34,6 @@ export const getExploreData = query({
   },
 });
 
-
 export const getBusinessesByScore = query({
   // Only define the filters you are passing from the frontend
   args: {
@@ -47,15 +46,44 @@ export const getBusinessesByScore = query({
     const indexName = args.level === 6 ? "by_type_geo6_score" : "by_type_geo5_score";
     const hashField = args.level === 6 ? "geohash_6" : "geohash_5";
 
-    return await ctx.db
-      .query("businesses")
-      .withIndex(indexName, (q) =>
-        q.eq("typeId", args.typeId).eq(hashField as any, args.geohash)
-      )
-      .order("desc") // Show highest Recommendation Score first
-      .paginate(args.paginationOpts); 
+    // Get neighboring geohashes to handle edge cases
+    const neighborHashes = getGeohashNeighbors(args.geohash);
+    
+    // Query all neighboring geohashes and merge results
+    const allResults = await Promise.all(
+      neighborHashes.map(async (hash) => {
+        return await ctx.db
+          .query("businesses")
+          .withIndex(indexName, (q) =>
+            q.eq("typeId", args.typeId).eq(hashField as any, hash)
+          )
+          .order("desc") // Show highest Recommendation Score first
+          .take(50); // Take more from each neighbor to have enough candidates
+      })
+    );
+
+    // Merge and deduplicate results
+    const mergedResults = allResults.flat().filter((business, index, self) => 
+      index === self.findIndex((b) => b._id === business._id)
+    );
+
+    // Sort by recommendation score
+    mergedResults.sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    // Apply pagination manually
+    const { cursor, numItems } = args.paginationOpts;
+    const startIndex = cursor ? parseInt(cursor) : 0;
+    const endIndex = startIndex + numItems;
+    const page = mergedResults.slice(startIndex, endIndex);
+
+    return {
+      page,
+      isDone: endIndex >= mergedResults.length,
+      continueCursor: endIndex < mergedResults.length ? endIndex.toString() : null,
+    };
   },
 });
+
 export const updateBusinessScore = mutation({
   args: { businessId: v.id("businesses"), rating: v.number() },
   handler: async (ctx, args) => {

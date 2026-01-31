@@ -26,7 +26,7 @@ export const toggleFavorite = mutation({
         userId: args.userId, 
         businessId: args.businessId,
         isCelebrity: business?.isCelebrity ?? false,
-        affinityScore: 0 // Default score, can be updated later by affinity calculation
+        affinityScore: 150 // Default affinity score for new favorites
       });
       // Increase count
       await ctx.db.patch(args.userId, { 

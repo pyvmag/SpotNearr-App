@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
+import { getGeohashNeighbors } from "./geohash";
 
 export const getFeed = query({
   args: {
@@ -45,7 +46,10 @@ export const getFeed = query({
         .map(item => item.contentId)
     );
 
-    // B. Fetch "Inbox" (Pushed Content) - Only within 7 days, paginated by cursor
+    // B. Fetch "Celebrity Pull" (Celebrity Business Content)
+    const celebrityContent = await getCelebrityPull(ctx, user._id, seenContentIds, sevenDaysAgo, cursor);
+
+    // C. Fetch "Inbox" (Pushed Content) - Only within 7 days, paginated by cursor
     const inboxItems = await ctx.db 
       .query("user_feed_items") 
       .withIndex("by_user_created", (q) => q.eq("userId", user._id))
@@ -57,15 +61,25 @@ export const getFeed = query({
       .take(limit * 2); // Fetch more to account for seen content filtering
 
     // C. Fetch "Local Discovery" (Nearby Content) - Only within 7 days, paginated by cursor
-    const localItems = await ctx.db
-      .query("content")
-      .withIndex("by_geo_score", (q) => q.eq("geohash_6", args.geohash))
-      .filter((q: any) => q.and(
-        q.gte(q.field("createdAt"), sevenDaysAgo),
-        q.lt(q.field("createdAt"), cursor)
-      ))
-      .order("desc")
-      .take(limit * 2); // Fetch more to account for seen content filtering
+    const neighborHashes = getGeohashNeighbors(args.geohash);
+    const localItemsArrays = await Promise.all(
+      neighborHashes.map(async (hash) => {
+        return await ctx.db
+          .query("content")
+          .withIndex("by_geo_score", (q) => q.eq("geohash_6", hash))
+          .filter((q: any) => q.and(
+            q.gte(q.field("createdAt"), sevenDaysAgo),
+            q.lt(q.field("createdAt"), cursor)
+          ))
+          .order("desc")
+          .take(Math.ceil(limit * 2 / neighborHashes.length)); // Distribute limit across neighbors
+      })
+    );
+
+    // Merge and deduplicate local items
+    const localItems = localItemsArrays.flat().filter((content, index, self) => 
+      index === self.findIndex((c) => c._id === content._id)
+    );
 
     // --- 4. FILTER SEEN CONTENT & MERGE & DEDUPLICATE ---
     
@@ -77,8 +91,8 @@ export const getFeed = query({
     // Filter out nulls (in case a post was deleted but feed item remained)
     const validInboxContent = inboxContentDocs.filter((c): c is Doc<"content"> => c !== null);
 
-    // Merge: Inbox first, then Local
-    const allContent = [...validInboxContent, ...localItems];
+    // Merge: Celebrity first, then Inbox, then Local
+    const allContent = [...celebrityContent, ...validInboxContent, ...localItems];
 
     // Filter out seen content and deduplicate
     const uniqueMap = new Map<string, Doc<"content">>();
@@ -105,19 +119,96 @@ export const getFeed = query({
 
 // 2. Guest Mode Helper
 async function getLocalTrends(ctx: any, geohash: string, limit: number, sevenDaysAgo: number, cursor: number) {
-  const content = await ctx.db
-    .query("content")
-    .withIndex("by_geo_score", (q: any) => q.eq("geohash_6", geohash))
-    .filter((q: any) => q.and(
-      q.gte(q.field("createdAt"), sevenDaysAgo),
-      q.lt(q.field("createdAt"), cursor)
-    ))
-    .order("desc")
-    .take(limit);
+  // Get neighboring geohashes to handle edge cases
+  const neighborHashes = getGeohashNeighbors(geohash);
+  
+  // Query all neighboring geohashes and merge results
+  const contentArrays = await Promise.all(
+    neighborHashes.map(async (hash) => {
+      return await ctx.db
+        .query("content")
+        .withIndex("by_geo_score", (q: any) => q.eq("geohash_6", hash))
+        .filter((q: any) => q.and(
+          q.gte(q.field("createdAt"), sevenDaysAgo),
+          q.lt(q.field("createdAt"), cursor)
+        ))
+        .order("desc")
+        .take(Math.ceil(limit / neighborHashes.length)); // Distribute limit across neighbors
+    })
+  );
+
+  // Merge and deduplicate content
+  const content = contentArrays.flat().filter((item, index, self) => 
+    index === self.findIndex((c) => c._id === item._id)
+  );
+
+  // Sort by feedScore (highest first) then by createdAt (newest first) for tie-breaking
+  content.sort((a, b) => {
+    if (b.feedScore !== a.feedScore) {
+      return b.feedScore - a.feedScore;
+    }
+    return b.createdAt - a.createdAt;
+  });
+
+  // Apply final limit
+  const finalContent = content.slice(0, limit);
 
   return {
-    items: content, // No enrichment needed - data is denormalized
-    nextCursor: content.length > 0 ? content[content.length - 1].createdAt : null,
-    hasMore: content.length === limit,
+    items: finalContent, // No enrichment needed - data is denormalized
+    nextCursor: finalContent.length > 0 ? finalContent[finalContent.length - 1].createdAt : null,
+    hasMore: finalContent.length === limit,
   };
+}
+
+// 3. Celebrity Pull Helper (Optimized for Scale)
+async function getCelebrityPull(ctx: any, userId: string, seenContentIds: Set<string>, sevenDaysAgo: number, cursor: number): Promise<Doc<"content">[]> {
+  // Limit to top 20 celebrity businesses to prevent memory issues
+  const celebrityFavorites = await ctx.db
+    .query("favorites")
+    .withIndex("by_user_score", (q: any) => q.eq("userId", userId))
+    .filter((q: any) => q.and(
+      q.gt(q.field("affinityScore"), 100),
+      q.eq(q.field("isCelebrity"), true)
+    ))
+    .order("desc") // Get highest affinity scores first
+    .take(20); // Limit to prevent performance issues
+
+  if (celebrityFavorites.length === 0) {
+    return [];
+  }
+
+  // Extract business IDs for batch query
+  const businessIds = celebrityFavorites.map((fav: any) => fav.businessId);
+  
+  // Batch fetch all content from celebrity businesses at once
+  const allCelebrityContent = await ctx.db
+    .query("content")
+    .filter((q: any) => q.and(
+      q.gte(q.field("createdAt"), sevenDaysAgo),
+      q.lt(q.field("createdAt"), cursor),
+      q.eq(q.field("isCelebrity"), true),
+      // Filter by business IDs using OR logic
+      ...businessIds.map((businessId: any) => q.eq(q.field("businessId"), businessId))
+    ))
+    .order("desc")
+    .take(50); // Limit total celebrity content
+
+  // Group content by business and take latest 2 per business
+  const contentByBusiness = new Map<string, Doc<"content">[]>();
+  
+  for (const content of allCelebrityContent) {
+    if (!seenContentIds.has(content._id)) {
+      const businessId = content.businessId;
+      if (!contentByBusiness.has(businessId)) {
+        contentByBusiness.set(businessId, []);
+      }
+      const businessContent = contentByBusiness.get(businessId)!;
+      if (businessContent.length < 2) {
+        businessContent.push(content);
+      }
+    }
+  }
+
+  // Flatten and return (max 40 items: 20 businesses × 2 posts each)
+  return Array.from(contentByBusiness.values()).flat();
 }
