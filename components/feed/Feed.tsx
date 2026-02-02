@@ -70,10 +70,10 @@ export default function FeedScreen() {
   // Generate geohash from location coordinates
   const geohash = location ? encodeGeohash(location.lat, location.lng, 6) : null;
 
-  // Ultra-simple query - no cursor to prevent infinite loops
+  // Use the new getFeed API with geohash from location and pagination
   const feedData = useQuery(
     api.feed.getFeed,
-    geohash ? { geohash, limit: PAGE_SIZE } : "skip"
+    geohash && !refreshing && (loadingMore || nextCursor === null) ? { geohash, limit: PAGE_SIZE, cursor: nextCursor || undefined } : "skip"
   );
 
   const markAsSeen = useMutation(api.interactions.markAsSeen);
@@ -124,9 +124,21 @@ export default function FeedScreen() {
 
     if (nextCursor === null || refreshing) {
       // Initial load or refresh - replace all items
-      setItems(feedData.items || []);
+      const newItems = feedData.items || [];
+      setItems(newItems);
+
+      // 💾 Cache first 20 posts only (on initial load or refresh)
+      if (nextCursor === null && newItems.length > 0) {
+        const first20 = newItems.slice(0, PAGE_SIZE);
+        setCachedData(CACHE_KEYS.FEED, first20)
+          .then(() => {
+            console.log("[Feed] Cached first 20 posts");
+            setLoadedFromCache(false); // Now showing fresh data
+          })
+          .catch((err) => console.error("[Feed] Failed to cache feed:", err));
+      }
     } else {
-      // Load more - append new items
+      // Load more - append new items (DON'T cache pagination)
       setItems(prev => {
         const existingIds = new Set(prev.map(p => p._id));
         const newItems = (feedData.items || []).filter((item: any) => !existingIds.has(item._id));
@@ -138,10 +150,7 @@ export default function FeedScreen() {
     setNextCursor(feedData.nextCursor);
     setLoadingMore(false);
     setInitialLoading(false);
-    if (refreshing) {
-      setRefreshing(false);
-    }
-  }, [feedData]);
+  }, [feedData, nextCursor, refreshing]);
 
   // 👀 Track viewed items
   const onViewableItemsChanged = useCallback(
@@ -156,26 +165,35 @@ export default function FeedScreen() {
   );
 
   // 💾 Flush seen items
-  const flushSeen = useCallback(async () => {
+  const flushSeen = async () => {
     if (!userId || seenRef.current.size === 0) return;
 
     const ids = Array.from(seenRef.current);
     seenRef.current.clear();
 
     await markAsSeen({ contentIds: ids as Id<"content">[] });
-  }, [userId, markAsSeen]);
+  };
 
 
   // 🔁 Pull to refresh
-  const onRefresh = useCallback(async () => {
+  const onRefresh = async () => {
+    // Check if online before attempting refresh
+    const online = await isOnline();
+
+    if (!online) {
+      console.log("[Feed] Can't refresh while offline");
+      return;
+    }
+
     setRefreshing(true);
     await flushSeen();
+    setNextCursor(null); // Reset cursor for fresh load
     setItems([]);
     setHasMore(true);
     setInitialLoading(true);
     setLoadedFromCache(false);
     setRefreshing(false);
-  }, [flushSeen]);
+  };
 
   const loadMore = () => {
     if (!hasMore || loadingMore || items.length === 0 || !isConnected) return;
@@ -221,22 +239,6 @@ export default function FeedScreen() {
         </Text>
         <Text className="text-slate-500 mt-2 text-center px-6">
           Please enable location to see posts and offers from nearby businesses.
-        </Text>
-      </View>
-    );
-  }
-
-  if (items.length === 0 && !loadingMore && !initialLoading) {
-    return (
-      <View 
-        className="flex-1 items-center justify-center px-6 bg-gray-50"
-        style={{ paddingTop: insets.top }}
-      >
-        <Text className="text-lg font-bold text-slate-700">
-          No posts yet
-        </Text>
-        <Text className="text-slate-500 mt-2 text-center">
-          Follow businesses to see posts and offers in your area.
         </Text>
       </View>
     );

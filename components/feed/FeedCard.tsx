@@ -30,6 +30,7 @@ export default function FeedCard({
       params: { businessId: business?._id }
     });
   };
+  
 
   return (
     <View className={`${cardBg} mb-8 rounded-[36px] overflow-hidden`}>
