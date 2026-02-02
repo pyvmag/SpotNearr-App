@@ -109,7 +109,7 @@ export const getFeed = query({
       .slice(0, limit);
 
     return {
-      items: sortedFeed, // No enrichment needed - data is denormalized
+      items: sortedFeed,
       nextCursor: sortedFeed.length > 0 ? sortedFeed[sortedFeed.length - 1].createdAt : null,
       hasMore: sortedFeed.length === limit,
     };
@@ -154,7 +154,7 @@ async function getLocalTrends(ctx: any, geohash: string, limit: number, sevenDay
   const finalContent = content.slice(0, limit);
 
   return {
-    items: finalContent, // No enrichment needed - data is denormalized
+    items: finalContent,
     nextCursor: finalContent.length > 0 ? finalContent[finalContent.length - 1].createdAt : null,
     hasMore: finalContent.length === limit,
   };

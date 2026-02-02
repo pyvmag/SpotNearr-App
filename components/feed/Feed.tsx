@@ -14,6 +14,9 @@ import FeedCard from "@/components/feed/FeedCard";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUserLocation } from "@/src/context/LocationContext";
+import { CACHE_KEYS, getCachedData, setCachedData } from "@/lib/cacheService";
+import { isOnline, subscribeToNetworkStatus } from "@/lib/networkUtils";
+import { Ionicons } from "@expo/vector-icons";
 
 // Simple geohash implementation (same as convex/geohash.ts)
 const B32 = "0123456789bcdefghjkmnpqrstuvwxyz";
@@ -58,6 +61,8 @@ export default function FeedScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(true);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
   // Generate geohash from location coordinates
   const geohash = location ? encodeGeohash(location.lat, location.lng, 6) : null;
@@ -72,15 +77,65 @@ export default function FeedScreen() {
   const seenRef = useRef<Set<string>>(new Set());
   const appState = useRef(AppState.currentState);
 
+  // 📡 Network status monitoring
+  useEffect(() => {
+    // Check initial network status
+    isOnline().then(setIsConnected);
+
+    // Subscribe to network changes
+    const unsubscribe = subscribeToNetworkStatus((connected) => {
+      setIsConnected(connected);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // 💾 Load cached feed on mount (only if offline or no data loaded yet)
+  useEffect(() => {
+    const loadCachedFeed = async () => {
+      try {
+        const online = await isOnline();
+
+        // Only load from cache if offline OR on initial load
+        if (!online || items.length === 0) {
+          const cached = await getCachedData<any[]>(CACHE_KEYS.FEED, Infinity); // No expiry
+
+          if (cached && cached.length > 0) {
+            console.log("[Feed] Loaded from cache:", cached.length, "posts");
+            setItems(cached);
+            setLoadedFromCache(true);
+            setInitialLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error("[Feed] Error loading cached feed:", error);
+      }
+    };
+
+    loadCachedFeed();
+  }, []);
+
   // 🔹 Update items when feed data changes
   useEffect(() => {
     if (!feedData) return;
 
     if (nextCursor === null || refreshing) {
       // Initial load or refresh - replace all items
-      setItems(feedData.items || []);
+      const newItems = feedData.items || [];
+      setItems(newItems);
+
+      // 💾 Cache first 20 posts only (on initial load or refresh)
+      if (nextCursor === null && newItems.length > 0) {
+        const first20 = newItems.slice(0, PAGE_SIZE);
+        setCachedData(CACHE_KEYS.FEED, first20)
+          .then(() => {
+            console.log("[Feed] Cached first 20 posts");
+            setLoadedFromCache(false); // Now showing fresh data
+          })
+          .catch((err) => console.error("[Feed] Failed to cache feed:", err));
+      }
     } else {
-      // Load more - append new items
+      // Load more - append new items (DON'T cache pagination)
       setItems(prev => {
         const existingIds = new Set(prev.map(p => p._id));
         const newItems = (feedData.items || []).filter((item: any) => !existingIds.has(item._id));
@@ -119,18 +174,27 @@ export default function FeedScreen() {
 
   // 🔁 Pull to refresh
   const onRefresh = async () => {
+    // Check if online before attempting refresh
+    const online = await isOnline();
+
+    if (!online) {
+      console.log("[Feed] Can't refresh while offline");
+      return;
+    }
+
     setRefreshing(true);
     await flushSeen();
     setNextCursor(null); // Reset cursor for fresh load
     setItems([]);
     setHasMore(true);
     setInitialLoading(true);
+    setLoadedFromCache(false);
     setRefreshing(false);
   };
 
   const loadMore = () => {
-    if (!hasMore || loadingMore || items.length === 0) return;
-    
+    if (!hasMore || loadingMore || items.length === 0 || !isConnected) return;
+
     setLoadingMore(true);
   };
 
@@ -149,9 +213,9 @@ export default function FeedScreen() {
     return () => sub.remove();
   }, [userId]);
 
-  if (!user || (feedData === undefined && nextCursor === null && initialLoading)) {
+  if (!user || (feedData === undefined && nextCursor === null && initialLoading && !loadedFromCache)) {
     return (
-      <View 
+      <View
         className="flex-1 items-center justify-center bg-gray-50"
         style={{ paddingTop: insets.top }}
       >
@@ -163,7 +227,7 @@ export default function FeedScreen() {
 
   if (!location) {
     return (
-      <View 
+      <View
         className="flex-1 items-center justify-center bg-gray-50"
         style={{ paddingTop: insets.top }}
       >
@@ -179,7 +243,7 @@ export default function FeedScreen() {
 
   if (items.length === 0 && !loadingMore && !initialLoading) {
     return (
-      <View 
+      <View
         className="flex-1 items-center justify-center px-6 bg-gray-50"
         style={{ paddingTop: insets.top }}
       >
@@ -194,16 +258,26 @@ export default function FeedScreen() {
   }
 
   return (
-    <View 
+    <View
       className="flex-1 bg-gray-50"
       style={{ paddingTop: insets.top }}
     >
+      {/* 📴 Offline Banner */}
+      {!isConnected && (
+        <View className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex-row items-center">
+          <Ionicons name="cloud-offline-outline" size={20} color="#d97706" />
+          <Text className="text-amber-800 text-sm ml-2 flex-1">
+            You're offline - showing recent posts
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={items}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <FeedCard 
-            content={item} 
+          <FeedCard
+            content={item}
             business={{
               name: item.businessName,
               logoUrl: item.businessIcon,
@@ -216,7 +290,12 @@ export default function FeedScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#059669"
+            colors={["#059669"]}
+          />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}

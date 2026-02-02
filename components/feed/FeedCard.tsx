@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
   Dimensions,
-  Image,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 
 const { width } = Dimensions.get("window");
 
@@ -27,6 +27,8 @@ export default function FeedCard({
               uri: business?.logoUrl || business?.profileImage || "https://via.placeholder.com/100",
             }}
             className="w-9 h-9 rounded-full bg-gray-100"
+            cachePolicy="disk"
+            transition={200}
           />
         </View>
         <View className="ml-3 flex-1">
@@ -50,7 +52,10 @@ export default function FeedCard({
           source={{ uri: content.imageUrl }}
           style={{ width: width - 32, height: width - 32 }}
           className="rounded-[28px] bg-gray-100"
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="disk"
+          transition={200}
+          placeholder={{ blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4" }}
         />
       </View>
 
