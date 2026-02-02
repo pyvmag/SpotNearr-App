@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
+import { shareBusiness } from "@/lib/shareUtils";
 
 interface BusinessProfileHeaderProps {
   business: any;
@@ -59,35 +60,35 @@ export default function BusinessProfileHeader({
         </View>
 
         {/* --- OPTION 3: THE STATS ROW --- */}
-        <TouchableOpacity 
-            onPress={openReviews}
-            activeOpacity={0.7}
-            className="flex-row items-center mb-6"
+        <TouchableOpacity
+          onPress={openReviews}
+          activeOpacity={0.7}
+          className="flex-row items-center mb-6"
         >
-            {/* Rating */}
-            <View className="flex-row items-center bg-green-50 px-2 py-1 rounded-md mr-3 border border-green-100">
-                <Text className="font-bold text-emerald-700 text-sm mr-1">
-                    {business.rating ? Number(business.rating).toFixed(1) : "N/A"}
-                </Text>
-                <Ionicons name="star" size={12} color="#047857" />
-            </View>
-
-            {/* Review Count */}
-            <Text className="text-slate-600 font-medium text-sm underline decoration-slate-300 decoration-dotted">
-                {business.reviewCount || 0} Reviews
+          {/* Rating */}
+          <View className="flex-row items-center bg-green-50 px-2 py-1 rounded-md mr-3 border border-green-100">
+            <Text className="font-bold text-emerald-700 text-sm mr-1">
+              {business.rating ? Number(business.rating).toFixed(1) : "N/A"}
             </Text>
+            <Ionicons name="star" size={12} color="#047857" />
+          </View>
 
-            {/* Separator Dot */}
-            <Text className="text-slate-300 mx-2">•</Text>
+          {/* Review Count */}
+          <Text className="text-slate-600 font-medium text-sm underline decoration-slate-300 decoration-dotted">
+            {business.reviewCount || 0} Reviews
+          </Text>
 
-            {/* Verification Badge (Visual Flair) */}
-            <View className="flex-row items-center">
-                <Ionicons name="shield-checkmark" size={14} color="#94a3b8" />
-                <Text className="text-slate-400 text-xs ml-1 font-medium">Verified</Text>
-            </View>
-            
-            {/* Chevron to indicate clickability */}
-            <Ionicons name="chevron-forward" size={16} color="#cbd5e1" style={{ marginLeft: "auto" }} />
+          {/* Separator Dot */}
+          <Text className="text-slate-300 mx-2">•</Text>
+
+          {/* Verification Badge (Visual Flair) */}
+          <View className="flex-row items-center">
+            <Ionicons name="shield-checkmark" size={14} color="#94a3b8" />
+            <Text className="text-slate-400 text-xs ml-1 font-medium">Verified</Text>
+          </View>
+
+          {/* Chevron to indicate clickability */}
+          <Ionicons name="chevron-forward" size={16} color="#cbd5e1" style={{ marginLeft: "auto" }} />
         </TouchableOpacity>
 
 
@@ -102,9 +103,8 @@ export default function BusinessProfileHeader({
         ) : (
           <TouchableOpacity
             onPress={onToggleFavorite}
-            className={`w-full py-3.5 rounded-2xl items-center flex-row justify-center border-2 ${
-                isFavorited ? "bg-white border-rose-500" : "bg-rose-500 border-rose-500"
-            }`}
+            className={`w-full py-3.5 rounded-2xl items-center flex-row justify-center border-2 ${isFavorited ? "bg-white border-rose-500" : "bg-rose-500 border-rose-500"
+              }`}
           >
             <Ionicons
               name={isFavorited ? "heart" : "heart-outline"}
@@ -116,6 +116,17 @@ export default function BusinessProfileHeader({
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* Share Button (New) */}
+        <TouchableOpacity
+          onPress={() => shareBusiness(business)}
+          className="w-full py-3.5 mt-3 rounded-2xl items-center flex-row justify-center border-2 border-slate-100 bg-slate-50"
+        >
+          <Ionicons name="share-social-outline" size={22} color="#475569" />
+          <Text className="font-bold text-lg ml-2 text-slate-600">
+            Share Profile
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

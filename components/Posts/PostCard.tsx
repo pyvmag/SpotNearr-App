@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAction } from "convex/react";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, Image, Text, TouchableOpacity, View } from "react-native";
+import { shareContent } from "@/lib/shareUtils";
 
 const { width } = Dimensions.get("window");
 
@@ -70,7 +71,7 @@ export default function PostCard({ post, business, isOwner, showHeader = true, o
                         <Ionicons name="chatbubble-outline" size={24} color="#1e293b" />
                         <Text className="ml-1 font-bold text-slate-700 text-sm">3</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => shareContent(post, business)}>
                         <Ionicons name="paper-plane-outline" size={24} color="#1e293b" />
                     </TouchableOpacity>
                 </View>

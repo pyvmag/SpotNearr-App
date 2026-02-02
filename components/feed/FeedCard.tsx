@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { shareContent } from "@/lib/shareUtils";
 
 const { width } = Dimensions.get("window");
 
@@ -20,7 +21,7 @@ export default function FeedCard({
   const isOffer = content.type === "offer"; //
 
   // Conditional styling to differentiate Posts vs Offers without clutter
-  const cardBg = isOffer ? "bg-pink-100/30" : "bg-white"; 
+  const cardBg = isOffer ? "bg-pink-100/30" : "bg-white";
   const accentColor = isOffer ? "#ba0054ff" : "#10b981"; // Pink-600 vs Emerald-500
 
   const handleBusinessPress = () => {
@@ -30,15 +31,15 @@ export default function FeedCard({
       params: { businessId: business?._id }
     });
   };
-  
+
 
   return (
     <View className={`${cardBg} mb-8 rounded-[36px] overflow-hidden`}>
-      
+
       {/* Header: Simplified for spaciousness */}
       <View className="flex-row items-center px-6 py-5">
-        <TouchableOpacity 
-          onPress={handleBusinessPress} 
+        <TouchableOpacity
+          onPress={handleBusinessPress}
           className="flex-row items-center flex-1"
         >
           <Image
@@ -101,7 +102,10 @@ export default function FeedCard({
             <Text className="text-[10px] font-bold mt-1 text-slate-400">3</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity className="items-center justify-center min-w-[48px] -mt-5">
+          <TouchableOpacity
+            onPress={() => shareContent(content, business)}
+            className="items-center justify-center min-w-[48px] -mt-5"
+          >
             <Ionicons name="share-outline" size={24} color="#64748b" />
           </TouchableOpacity>
         </View>
