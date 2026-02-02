@@ -49,10 +49,10 @@ function NavigationGate() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
 
-  // ✅ Skip Convex when offline
+  // ✅ Skip Convex when offline OR when not logged in
   const user = useQuery(
     api.users.getMe,
-    isConnected ? {} : "skip"
+    (isConnected && session) ? {} : "skip"
   );
 
   const createUser = useMutation(api.users.createUserIfNotExists);
