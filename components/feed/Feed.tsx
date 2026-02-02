@@ -6,6 +6,7 @@ import {
   Text,
   RefreshControl,
   AppState,
+  TouchableOpacity,
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -17,6 +18,7 @@ import { useUserLocation } from "@/src/context/LocationContext";
 import { CACHE_KEYS, getCachedData, setCachedData } from "@/lib/cacheService";
 import { isOnline, subscribeToNetworkStatus } from "@/lib/networkUtils";
 import { Ionicons } from "@expo/vector-icons";
+import { LocationModal } from "@/components/explore/LocationModal";
 
 // Simple geohash implementation (same as convex/geohash.ts)
 const B32 = "0123456789bcdefghjkmnpqrstuvwxyz";
@@ -53,7 +55,7 @@ export default function FeedScreen() {
   const user = useUserProfile();
   const userId = user?._id;
   const insets = useSafeAreaInsets();
-  const { location } = useUserLocation();
+  const { location, loading: locationLoading } = useUserLocation();
 
   const [items, setItems] = useState<any[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -63,6 +65,7 @@ export default function FeedScreen() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
+  const [isLocationModalVisible, setLocationModalVisible] = useState(false);
 
   // Generate geohash from location coordinates
   const geohash = location ? encodeGeohash(location.lat, location.lng, 6) : null;
@@ -241,22 +244,6 @@ export default function FeedScreen() {
     );
   }
 
-  if (items.length === 0 && !loadingMore && !initialLoading) {
-    return (
-      <View
-        className="flex-1 items-center justify-center px-6 bg-gray-50"
-        style={{ paddingTop: insets.top }}
-      >
-        <Text className="text-lg font-bold text-slate-700">
-          No posts yet
-        </Text>
-        <Text className="text-slate-500 mt-2 text-center">
-          Follow businesses to see posts and offers in your area.
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <View
       className="flex-1 bg-gray-50"
@@ -300,13 +287,53 @@ export default function FeedScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         ListHeaderComponent={() => (
-          <View className="px-4 py-3 bg-white border-b border-gray-100">
-            <Text className="text-lg font-bold text-slate-900">Your Feed</Text>
-            <Text className="text-sm text-slate-500">
-              Posts from your favorite businesses and nearby spots
-            </Text>
+          <View>
+            {/* Location Selector Bar */}
+            <TouchableOpacity
+              onPress={() => setLocationModalVisible(true)}
+              className="bg-white px-4 py-3 border-b border-slate-100 flex-row items-center"
+              activeOpacity={0.7}
+            >
+              <View className="bg-blue-50 p-2 rounded-full mr-3">
+                <Ionicons name="location" size={18} color="#2563eb" />
+              </View>
+
+              <View className="flex-1">
+                <Text className="text-[10px] uppercase text-blue-400 font-bold tracking-wider mb-0.5">
+                  Viewing near
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  className="text-sm font-bold text-slate-900 uppercase"
+                >
+                  {locationLoading ? "Locating..." : location?.label || "Select Location"}
+                </Text>
+              </View>
+
+              <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+
+            {/* Feed Title */}
+            <View className="px-4 py-3 bg-white border-b border-gray-100">
+              <Text className="text-lg font-bold text-slate-900">Your Feed</Text>
+              <Text className="text-sm text-slate-500">
+                Posts from your favorite businesses and nearby spots
+              </Text>
+            </View>
           </View>
         )}
+        ListEmptyComponent={
+          !loadingMore && !initialLoading ? (
+            <View className="items-center justify-center px-6 py-20">
+              <Text className="text-lg font-bold text-slate-700">
+                No posts yet
+              </Text>
+              <Text className="text-slate-500 mt-2 text-center">
+                Follow businesses to see posts and offers in your area.
+              </Text>
+            </View>
+          ) : null
+        }
         ListFooterComponent={
           loadingMore ? (
             <View className="py-4 items-center">
@@ -319,6 +346,12 @@ export default function FeedScreen() {
             </View>
           ) : null
         }
+      />
+
+      {/* Location Modal */}
+      <LocationModal
+        visible={isLocationModalVisible}
+        onClose={() => setLocationModalVisible(false)}
       />
     </View>
   );
