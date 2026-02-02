@@ -2,11 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
   Dimensions,
+  Image,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
@@ -15,112 +16,115 @@ export default function FeedCard({
   business,
   onPressCTA,
 }: any) {
-  const isOffer = content.type === "offer";
+  const router = useRouter();
+  const isOffer = content.type === "offer"; //
+
+  // Conditional styling to differentiate Posts vs Offers without clutter
+  const cardBg = isOffer ? "bg-pink-100/30" : "bg-white"; 
+  const accentColor = isOffer ? "#ba0054ff" : "#10b981"; // Pink-600 vs Emerald-500
+
+  const handleBusinessPress = () => {
+    // Navigate to business profile as requested
+    router.push({
+      pathname: "/(main)/(modals)/profile/BusinessProfile",
+      params: { businessId: business?._id }
+    });
+  };
 
   return (
-    <View className="bg-white mb-4 rounded-3xl overflow-hidden">
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3">
-        <View className={`p-[1px] border rounded-full ${business?.isCelebrity ? "border-purple-500" : "border-emerald-500"}`}>
+    <View className={`${cardBg} mb-8 rounded-[36px] overflow-hidden`}>
+      
+      {/* Header: Simplified for spaciousness */}
+      <View className="flex-row items-center px-6 py-5">
+        <TouchableOpacity 
+          onPress={handleBusinessPress} 
+          className="flex-row items-center flex-1"
+        >
           <Image
             source={{
               uri: business?.logoUrl || business?.profileImage || "https://via.placeholder.com/100",
             }}
             className="w-9 h-9 rounded-full bg-gray-100"
-            cachePolicy="disk"
-            transition={200}
           />
-        </View>
-        <View className="ml-3 flex-1">
-          <Text className="font-bold text-slate-900 text-sm">
-            {business?.name || "Business"}
-          </Text>
-          <Text className="text-gray-500 text-[10px]">
-            {business?.isCelebrity ? "Celebrity" : "Local Business"}
-          </Text>
-        </View>
-        {business?.isCelebrity && (
-          <View className="bg-purple-100 px-2 py-1 rounded-full">
-            <Text className="text-purple-600 text-[10px] font-semibold">VIP</Text>
+          <View className="ml-3">
+            <Text className="font-bold text-slate-900 text-[15px]">
+              {business?.name || "Local Spot"}
+            </Text>
+            <Text className="text-gray-400 text-[11px] font-medium">
+              {business?.address || "Neighborhood"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {business?.isCelebrity && ( //
+          <View className="bg-purple-100 px-3 py-1 rounded-full">
+            <Text className="text-purple-600 text-[9px] font-black uppercase">VIP</Text>
           </View>
         )}
       </View>
 
-      {/* Image */}
-      <View className="px-4">
+      {/* Main Content: Large visual with generous rounding */}
+      <View className="px-5">
         <Image
           source={{ uri: content.imageUrl }}
           style={{ width: width - 32, height: width - 32 }}
           className="rounded-[28px] bg-gray-100"
-          contentFit="cover"
-          cachePolicy="disk"
-          transition={200}
-          placeholder={{ blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4" }}
+          resizeMode="cover"
         />
       </View>
 
-      {/* Body */}
-      <View className="px-6 pt-4">
-        {isOffer && (
-          <Text className="text-xl font-extrabold text-slate-900 mb-1">
+      {/* Body: High-hierarchy typography */}
+      <View className="px-8 pt-6 pb-2">
+        {isOffer && content.offerTitle && ( //
+          <Text className="text-xl font-black text-slate-900 mb-2">
             {content.offerTitle}
           </Text>
         )}
 
-        <Text className="text-slate-700 text-sm leading-5">
+        <Text className="text-slate-600 text-[14px] leading-6">
           {content.caption}
         </Text>
-
-        {isOffer && content.expiryDate && (
-          <Text className="text-emerald-600 text-[11px] font-semibold mt-2">
-            Valid till{" "}
-            {new Date(content.expiryDate).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            })}
-          </Text>
-        )}
       </View>
 
-      {/* CTA + Actions */}
-      <View className="flex-row items-center justify-between px-6 py-4">
+      {/* Action Row: The "Spot" (Location Pin) instead of Heart */}
+      <View className="flex-row items-center justify-between px-8 py-5">
         <View className="flex-row items-center space-x-6">
-          <TouchableOpacity className="flex-row items-center">
-            <Ionicons name="heart-outline" size={22} color="#1e293b" />
-            <Text className="ml-1 text-slate-600 text-sm">12</Text>
+          <TouchableOpacity className="items-center justify-center min-w-[48px]">
+            {/* Phase 1: Using Location Pin for "Spotting" */}
+            <Ionicons name="star" size={24} color={accentColor} />
+            <Text className="text-[10px] font-bold mt-1 text-slate-400">12</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity className="flex-row items-center">
-            <Ionicons name="bookmark-outline" size={22} color="#1e293b" />
+          <TouchableOpacity className="items-center justify-center min-w-[48px]">
+            <Ionicons name="chatbubble-outline" size={24} color="#64748b" />
+            <Text className="text-[10px] font-bold mt-1 text-slate-400">3</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity>
-            <Ionicons name="paper-plane-outline" size={22} color="#1e293b" />
+          <TouchableOpacity className="items-center justify-center min-w-[48px] -mt-5">
+            <Ionicons name="share-outline" size={24} color="#64748b" />
           </TouchableOpacity>
         </View>
 
-        {isOffer && (
+        {isOffer && ( //
           <TouchableOpacity
             onPress={onPressCTA}
-            className="bg-emerald-500 px-4 py-2 rounded-full"
+            className="bg-slate-900 px-6 py-3 rounded-2xl"
           >
-            <Text className="text-white font-bold text-xs">
-              View Offer
+            <Text className="text-white font-black text-[11px] uppercase tracking-tighter">
+              Get Offer
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Timestamp */}
-      <View className="px-6 pb-4">
-        <Text className="text-gray-400 text-[10px] uppercase">
-          {new Date(content.createdAt).toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
-        </Text>
-      </View>
+      {/* Subtle Expiry Tag for Offers */}
+      {isOffer && content.expiryDate && ( //
+        <View className="px-8 pb-6">
+          <Text className="text-pink-500/60 text-[10px] font-bold uppercase tracking-widest">
+            Ends {new Date(content.expiryDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

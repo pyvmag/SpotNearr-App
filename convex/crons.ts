@@ -237,7 +237,7 @@ export const applyContentTimeDecay = internalMutation({
     const updates = [];
 
     for (const item of content) {
-      const ageInDays = Math.floor((now - item.createdAt) / oneDay);
+      const ageInDays = Math.floor((now - (item.createdAt || 0)) / oneDay);
       let decayFactor = 1.0;
 
       // Calculate time decay factor

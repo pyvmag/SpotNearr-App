@@ -147,21 +147,21 @@ export const Content = {
   
   // IMPORTANT: These must exist to be indexed
 
-  geohash_6: v.string(), 
+  geohash_6: v.optional(v.string()), 
 
-  geohash_5: v.string(), 
+  geohash_5: v.optional(v.string()), 
 
-  feedScore: v.number(),
+  feedScore: v.optional(v.number()),
 
-  createdAt: v.number(),
+  createdAt: v.optional(v.number()),
   
   // Denormalized business data for faster reads
 
-  businessName: v.string(),
+  businessName: v.optional(v.string()),
 
   businessIcon: v.optional(v.string()),
 
-  isCelebrity: v.boolean(),
+  isCelebrity: v.optional(v.boolean()),
 
   lastDecayFactor: v.optional(v.number()), // Track last applied decay factor
 
